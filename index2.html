@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1f6f5c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Gestion élèves">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<title>Gestion des élèves</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root{--bg:#f6f5f1;--card:#fff;--tx:#1d1d1b;--mu:#6b6a63;--ac:#1f6f5c;--ac2:#e3f1ec;--bd:#dedcd3;--rd:#b3372b;--or:#b86a00;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161715;--card:#222320;--tx:#efeee8;--mu:#a3a298;--ac:#5cc3a6;--ac2:#1f3a32;--bd:#3a3b36;--rd:#ff8a7d;--or:#f0b050;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#161715;--card:#222320;--tx:#efeee8;--mu:#a3a298;--ac:#5cc3a6;--ac2:#1f3a32;--bd:#3a3b36;--rd:#ff8a7d;--or:#f0b050;color-scheme:dark}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding-bottom:84px}
+main{max-width:640px;margin:0 auto;padding:14px}
+h1{font-size:20px;margin:4px 0 12px}h2{font-size:16px;margin:16px 0 6px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin:8px 0}
+input,select,textarea,button{font:inherit;color:var(--tx)}
+input,select,textarea{width:100%;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);margin:3px 0}
+textarea{min-height:130px;font:12px/1.4 ui-monospace,monospace}
+button{padding:10px 14px;border:1px solid var(--bd);border-radius:8px;background:var(--card);cursor:pointer}
+button.p{background:var(--ac);color:#fff;border-color:var(--ac)}button.d{color:var(--rd)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) button.p{color:#0c1a15}}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.row>*{flex:1}.row>button{flex:0 0 auto}
+.it{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--bd)}
+.it:last-child{border:0}.mu{color:var(--mu);font-size:14px}.ck{display:flex;gap:12px;flex-wrap:wrap}.ck label{display:flex;gap:4px;align-items:center}.ck input{width:auto}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav button{flex:1;border:0;border-radius:0;background:none;padding:14px 4px;font-size:14px;color:var(--mu)}
+nav button.on{color:var(--ac);font-weight:600;box-shadow:inset 0 2px var(--ac)}
+.bd{font-size:13px;padding:2px 8px;border-radius:99px;background:var(--ac2);color:var(--ac);white-space:nowrap}.bd.w{background:transparent;border:1px solid var(--or);color:var(--or)}
+#reader{width:100%;max-width:360px;margin:8px auto}
+.banner{padding:10px;border-radius:8px;background:var(--ac2);color:var(--ac);font-weight:600;margin:8px 0}
+.banner.e{background:transparent;border:1px solid var(--rd);color:var(--rd)}
+.big{font-size:20px;font-weight:700}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:9;padding:16px}
+#modal .box{background:#fff;color:#111;border-radius:14px;padding:18px;text-align:center;max-width:320px}
+#qr{display:flex;justify-content:center;margin:10px 0}
+.cards{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.qc{border:1px dashed var(--bd);border-radius:8px;padding:8px;text-align:center;font-size:13px;background:#fff;color:#111}
+.qc .q{display:flex;justify-content:center}
+@media print{nav,.noprint{display:none!important}body{background:#fff}}
+</style></head><body>
+<main><h1 id="t"></h1><div id="v"></div></main>
+<nav><button data-t="s">Séances</button><button data-t="e">Élèves</button><button data-t="g">Groupes</button><button data-t="x">Export</button></nav>
+<div id="modal"><div class="box"><b id="mn"></b><div id="qr"></div><button onclick="document.getElementById('modal').style.display='none'">Fermer</button></div></div>
+<script>
+const K='gestion_v2',SEC=['info','sciences','math','technique'],MAT=['informatique','programmation','sti'],NIV=['2ème','3ème','4ème'];
+let D={groups:[],students:[],sessions:[],pays:[]},tab='s',sid='',stu='',fg='',scanner=null,draft=null;
+try{const s=localStorage.getItem(K);if(s)D=Object.assign(D,JSON.parse(s))}catch(e){}
+const $=i=>document.getElementById(i),uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(D))}catch(e){}};
+const today=()=>new Date().toISOString().slice(0,10),full=s=>s.n+' '+s.p;
+const G=id=>D.groups.find(g=>g.id===id),S=id=>D.students.find(s=>s.id===id),SE=id=>D.sessions.find(s=>s.id===id);
+const gn=id=>G(id)?G(id).name:'—';
+const att=s=>D.sessions.filter(x=>x.att.includes(s.id)).length,paid=s=>D.pays.filter(p=>p.s===s.id).reduce((a,p)=>a+p.n,0),unp=s=>Math.max(0,att(s)-paid(s));
+const opts=(a,v)=>a.map(x=>`<option${x===v?' selected':''}>${x}</option>`).join('');
+const gopts=(v,all)=>(all?`<option value="">Tous les groupes</option>`:'')+D.groups.map(g=>`<option value="${g.id}"${g.id===v?' selected':''}>${esc(g.name)}</option>`).join('');
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{stop();tab=b.dataset.t;sid='';stu='';render()});
+function render(){
+ document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===tab&&!stu));
+ $('t').textContent=stu?'Fiche élève':sid?'Séance':{s:'Séances',e:'Élèves',g:'Groupes',x:'Export et sauvegarde'}[tab];
+ if(stu)return vSheet();
+ ({s:sid?vSess:vS,e:vE,g:vG,x:vX})[tab]();
+}
+/* ---------- Groupes ---------- */
+function vG(){
+ $('v').innerHTML=`<div class="card"><input id="gn" placeholder="Nom du groupe (ex. 3ème info – A)"><input id="gh" placeholder="Jour et horaire (ex. Samedi 10h)"><button class="p" onclick="addG()">Ajouter le groupe</button></div>`+
+ (D.groups.map(g=>`<div class="card it"><div><b>${esc(g.name)}</b><div class="mu">${esc(g.h||'')} · ${D.students.filter(s=>s.g===g.id).length} élèves</div></div><button class="d" onclick="delG('${g.id}')">✕</button></div>`).join('')||'<p class="mu">Aucun groupe.</p>');
+}
+function addG(){const n=$('gn').value.trim();if(!n)return;D.groups.push({id:uid(),name:n,h:$('gh').value.trim()});save();render()}
+function delG(id){if(!confirm('Supprimer ce groupe ? Ses élèves resteront sans groupe.'))return;D.students.forEach(s=>{if(s.g===id)s.g=''});D.groups=D.groups.filter(g=>g.id!==id);save();render()}
+/* ---------- Élèves ---------- */
+function vE(){
+ const L=D.students.filter(s=>!fg||s.g===fg);
+ $('v').innerHTML=`<div class="row"><select onchange="fg=this.value;vE()">${gopts(fg,1)}</select><button class="p" onclick="stu='new';draft=null;render()">＋ Élève</button></div>
+ <div class="row noprint"><button onclick="cards()">Cartes QR à imprimer</button></div><div id="cs"></div>`+
+ L.map(s=>{const u=unp(s);return `<div class="card it" onclick="stu='${s.id}';render()"><div><b>${esc(full(s))}</b><div class="mu">${esc(s.niv)} ${esc(s.sec)} · ${esc(gn(s.g))}</div></div><span class="bd${u?' w':''}">${u} non payée${u>1?'s':''}</span></div>`}).join('')||'<p class="mu">Aucun élève.</p>';
+}
+function cards(){const L=D.students.filter(s=>!fg||s.g===fg);$('cs').innerHTML='<button class="noprint" onclick="window.print()">Imprimer</button><div class="cards">'+L.map(s=>`<div class="qc"><div class="q" id="q${s.id}"></div><b>${esc(full(s))}</b><div>${esc(gn(s.g))}</div></div>`).join('')+'</div>';L.forEach(s=>mkQ($('q'+s.id),s.id,110))}
+function mkQ(el,t,sz){el.innerHTML='';try{new QRCode(el,{text:t,width:sz,height:sz})}catch(e){el.textContent='QR indisponible'}}
+const fld=(i,l,v,t)=>`<label class="mu">${l}</label><input id="${i}" type="${t||'text'}" value="${esc(v)}">`;
+function vSheet(){
+ const nw=stu==='new';if(nw&&!draft)draft={id:uid(),n:'',p:'',t:'',tp:'',niv:NIV[0],sec:SEC[0],ly:'',g:D.groups[0]?D.groups[0].id:'',m:[]};
+ const s=nw?draft:S(stu);if(!s){stu='';return render()}
+ let h=`<button onclick="stu='';draft=null;render()">← Retour</button>`;
+ if(!nw){const u=unp(s);h+=`<div class="card"><div class="big" style="color:var(--${u?'or':'ac'})">${u} séance${u>1?'s':''} non payée${u>1?'s':''}</div><div class="mu">${att(s)} séance(s) suivie(s) · ${paid(s)} payée(s)</div></div>`}
+ h+=`<div class="card">${fld('f_n','Nom',s.n)}${fld('f_p','Prénom',s.p)}${fld('f_t','Téléphone',s.t,'tel')}${fld('f_tp','Téléphone du parent',s.tp,'tel')}
+ <div class="row"><div><label class="mu">Niveau</label><select id="f_niv">${opts(NIV,s.niv)}</select></div><div><label class="mu">Section</label><select id="f_sec">${opts(SEC,s.sec)}</select></div></div>
+ ${fld('f_ly','Lycée',s.ly)}<label class="mu">Groupe (modifiable à tout moment)</label><select id="f_g"><option value="">—</option>${gopts(s.g)}</select>
+ <label class="mu">Matière(s) suivie(s)</label><div class="ck">${MAT.map(m=>`<label><input type="checkbox" value="${m}"${s.m.includes(m)?' checked':''}>${m}</label>`).join('')}</div>
+ <p><button class="p" onclick="saveS()">Enregistrer</button></p></div>`;
+ if(!nw){
+  h+=`<div class="card"><b>Paiements</b><div class="row"><input id="pd" type="date" value="${today()}"><input id="pa" type="number" placeholder="Montant"><input id="pn" type="number" value="4" placeholder="Nb séances"></div><button class="p" onclick="addPay()">Ajouter le paiement</button>`+
+  D.pays.filter(p=>p.s===s.id).sort((a,b)=>b.d.localeCompare(a.d)).map(p=>`<div class="it"><span>${p.d} · <b>${p.a}</b> <span class="mu">(${p.n} séances)</span></span><button class="d" onclick="delPay('${p.id}')">✕</button></div>`).join('')+`</div>`;
+  h+=`<div class="card"><b>Séances suivies</b>`+(D.sessions.filter(x=>x.att.includes(s.id)).sort((a,b)=>b.d.localeCompare(a.d)).map(x=>`<div class="it"><span>${x.d} · ${esc(x.m)}</span><span class="mu">${esc(gn(x.g))}</span></div>`).join('')||'<div class="mu">Aucune.</div>')+`</div>
+  <div class="row"><button onclick="showQ('${s.id}')">QR code</button><button class="d" onclick="delS('${s.id}')">Supprimer l’élève</button></div>`}
+ $('v').innerHTML=h;
+}
+function saveS(){
+ const nw=stu==='new',s=nw?draft:S(stu),g=i=>$(i).value.trim();
+ if(!g('f_n')&&!g('f_p'))return alert('Saisis au moins un nom ou un prénom.');
+ Object.assign(s,{n:g('f_n'),p:g('f_p'),t:g('f_t'),tp:g('f_tp'),niv:$('f_niv').value,sec:$('f_sec').value,ly:g('f_ly'),g:$('f_g').value,m:[...document.querySelectorAll('.ck input:checked')].map(c=>c.value)});
+ if(nw){D.students.push(s);draft=null}
+ save();stu='';render();
+}
+function delS(id){if(!confirm('Supprimer cet élève et ses paiements ?'))return;D.students=D.students.filter(s=>s.id!==id);D.pays=D.pays.filter(p=>p.s!==id);D.sessions.forEach(x=>x.att=x.att.filter(a=>a!==id));save();stu='';render()}
+function addPay(){const a=parseFloat($('pa').value),n=parseInt($('pn').value);if(!(a>=0)||!(n>0))return alert('Montant et nombre de séances requis.');D.pays.push({id:uid(),s:stu,d:$('pd').value||today(),a,n});save();render()}
+function delPay(id){if(confirm('Supprimer ce paiement ?')){D.pays=D.pays.filter(p=>p.id!==id);save();render()}}
+function showQ(id){const s=S(id);$('mn').textContent=full(s);mkQ($('qr'),s.id,220);$('modal').style.display='flex'}
+/* ---------- Séances ---------- */
+function vS(){
+ if(!D.groups.length){$('v').innerHTML='<p class="mu">Crée d’abord un groupe.</p>';return}
+ $('v').innerHTML=`<div class="card"><select id="sg">${gopts('')}</select><div class="row"><input id="sd" type="date" value="${today()}"><select id="sm">${opts(MAT)}</select></div><button class="p" onclick="newSess()">Nouvelle séance</button></div>`+
+ D.sessions.slice().sort((a,b)=>b.d.localeCompare(a.d)).map(x=>`<div class="card it" onclick="sid='${x.id}';render()"><div><b>${x.d} · ${esc(x.m)}</b><div class="mu">${esc(gn(x.g))}</div></div><span class="bd">${x.att.length} présent${x.att.length>1?'s':''}</span></div>`).join('');
+}
+function newSess(){const x={id:uid(),g:$('sg').value,d:$('sd').value||today(),m:$('sm').value,att:[]};D.sessions.push(x);save();sid=x.id;render()}
+function vSess(){
+ const x=SE(sid);if(!x){sid='';return render()}
+ $('v').innerHTML=`<button onclick="stop();sid='';render()">← Retour</button> <button class="d" onclick="delSess()">Supprimer la séance</button>
+ <p><b>${x.d} · ${esc(x.m)}</b> <span class="mu">${esc(gn(x.g))}</span></p>
+ <div class="row"><button class="p" onclick="start()">📷 Scanner</button><button onclick="stop()">Arrêter</button></div>
+ <div id="reader"></div><div id="bn"></div>
+ <div class="row"><select id="ms">${D.students.filter(s=>!x.att.includes(s.id)).sort((a,b)=>(b.g===x.g)-(a.g===x.g)).map(s=>`<option value="${s.id}">${esc(full(s))}</option>`).join('')}</select><button onclick="addMan()">Ajouter</button></div><div id="ls"></div>`;list();
+}
+function list(){const x=SE(sid);$('ls').innerHTML=`<h2>${x.att.length} présent(s)</h2>`+x.att.map(i=>S(i)).filter(Boolean).map(s=>{const u=unp(s);return `<div class="card it"><span>${esc(full(s))} <span class="bd${u?' w':''}">${u} non payée${u>1?'s':''}</span></span><button class="d" onclick="rm('${s.id}')">✕</button></div>`}).join('')}
+function addMan(){const i=$('ms').value;if(i){add(i);vSess()}}
+function add(i){const x=SE(sid);if(!x.att.includes(i)){x.att.push(i);save()}}
+function rm(i){const x=SE(sid);x.att=x.att.filter(a=>a!==i);save();vSess()}
+function delSess(){if(confirm('Supprimer cette séance ?')){stop();D.sessions=D.sessions.filter(x=>x.id!==sid);save();sid='';render()}}
+function bn(m,e){$('bn').innerHTML=`<div class="banner${e?' e':''}">${m}</div>`}
+function start(){
+ if(scanner)return;
+ try{scanner=new Html5Qrcode('reader');scanner.start({facingMode:'environment'},{fps:10,qrbox:220},onScan,()=>{}).catch(()=>{scanner=null;bn('Caméra inaccessible. Autorise-la, ou ajoute les élèves à la main.',1)})}
+ catch(e){scanner=null;bn('Scanner indisponible sur cet appareil.',1)}
+}
+function stop(){if(scanner){const s=scanner;scanner=null;s.stop().then(()=>s.clear()).catch(()=>{})}}
+let last='',lt=0;
+function onScan(t){
+ const n=Date.now();if(t===last&&n-lt<2500)return;last=t;lt=n;
+ const s=S(t),x=SE(sid);
+ if(!s)return bn('QR code inconnu',1);
+ if(x.att.includes(s.id))return bn(esc(full(s))+' : déjà présent');
+ add(s.id);try{navigator.vibrate&&navigator.vibrate(120)}catch(e){}
+ const u=unp(s);bn('✓ '+esc(full(s))+(u?' · '+u+' séance'+(u>1?'s':'')+' non payée'+(u>1?'s':''):''),u>2);list();
+}
+/* ---------- Export ---------- */
+const q=s=>"'"+String(s==null?'':s).replace(/'/g,"''")+"'";
+function genSQL(){
+ let o='CREATE TABLE groupes(id TEXT PRIMARY KEY,nom TEXT,horaire TEXT);\nCREATE TABLE eleves(id TEXT PRIMARY KEY,nom TEXT,prenom TEXT,tel TEXT,tel_parent TEXT,niveau TEXT,section TEXT,lycee TEXT,groupe_id TEXT,matieres TEXT);\nCREATE TABLE seances(id TEXT PRIMARY KEY,groupe_id TEXT,date TEXT,matiere TEXT);\nCREATE TABLE presences(seance_id TEXT,eleve_id TEXT);\nCREATE TABLE paiements(id TEXT PRIMARY KEY,eleve_id TEXT,date TEXT,montant REAL,nb_seances INTEGER);\n';
+ D.groups.forEach(g=>o+=`INSERT INTO groupes VALUES(${q(g.id)},${q(g.name)},${q(g.h)});\n`);
+ D.students.forEach(s=>o+=`INSERT INTO eleves VALUES(${q(s.id)},${q(s.n)},${q(s.p)},${q(s.t)},${q(s.tp)},${q(s.niv)},${q(s.sec)},${q(s.ly)},${q(s.g)},${q(s.m.join(','))});\n`);
+ D.sessions.forEach(x=>{o+=`INSERT INTO seances VALUES(${q(x.id)},${q(x.g)},${q(x.d)},${q(x.m)});\n`;x.att.forEach(a=>o+=`INSERT INTO presences VALUES(${q(x.id)},${q(a)});\n`)});
+ D.pays.forEach(p=>o+=`INSERT INTO paiements VALUES(${q(p.id)},${q(p.s)},${q(p.d)},${p.a},${p.n});\n`);return o}
+function genCSV(){return 'nom;prenom;tel;tel_parent;niveau;section;lycee;groupe;matieres;seances_suivies;seances_payees;non_payees\n'+D.students.map(s=>[s.n,s.p,s.t,s.tp,s.niv,s.sec,s.ly,gn(s.g),s.m.join('+'),att(s),paid(s),unp(s)].join(';')).join('\n')}
+function genPay(){return 'date;eleve;montant;nb_seances\n'+D.pays.map(p=>{const s=S(p.s);return [p.d,s?full(s):'?',p.a,p.n].join(';')}).join('\n')}
+function out(t,name,mime){$('o').value=t;$('o').dataset.n=name;$('o').dataset.m=mime}
+function vX(){
+ $('v').innerHTML=`<div class="card"><div class="row"><button class="p" onclick="out(genSQL(),'gestion.sql','text/plain')">SQL</button><button onclick="out(genCSV(),'eleves.csv','text/csv')">CSV élèves</button><button onclick="out(genPay(),'paiements.csv','text/csv')">CSV paiements</button><button onclick="out(JSON.stringify(D),'sauvegarde.json','application/json')">JSON</button></div>
+ <textarea id="o" placeholder="Choisis un format : le contenu apparaît ici."></textarea>
+ <div class="row"><button onclick="cp()">Copier</button><button onclick="dl()">Télécharger / partager</button></div><div id="xm" class="mu"></div></div>
+ <div class="card"><b>Restaurer une sauvegarde JSON</b><textarea id="im" placeholder="Colle ici le JSON"></textarea><button onclick="imp()">Restaurer</button></div>`}
+function cp(){const t=$('o');t.select();try{navigator.clipboard.writeText(t.value).then(()=>$('xm').textContent='Copié.',()=>document.execCommand('copy'))}catch(e){document.execCommand('copy')}}
+async function dl(){
+ const t=$('o'),n=t.dataset.n||'export.txt';if(!t.value)return;
+ const f=new File([t.value],n,{type:t.dataset.m||'text/plain'});
+ try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:n});return}}catch(e){}
+ try{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=n;document.body.appendChild(a);a.click();a.remove();$('xm').textContent='Si rien ne se télécharge, utilise « Copier » et colle dans un fichier.'}catch(e){$('xm').textContent='Utilise « Copier ».'}
+}
+function imp(){try{const j=JSON.parse($('im').value);if(!j.groups||!j.students)throw 0;if(!confirm('Remplacer toutes les données actuelles ?'))return;D=Object.assign({groups:[],students:[],sessions:[],pays:[]},j);save();alert('Données restaurées');tab='s';render()}catch(e){alert('JSON invalide')}}
+render();
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}))}
+</script></body></html>

@@ -54,6 +54,8 @@ try{const s=localStorage.getItem(K);if(s)D=Object.assign(D,JSON.parse(s))}catch(
 const $=i=>document.getElementById(i),uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const save=()=>{try{localStorage.setItem(K,JSON.stringify(D))}catch(e){}};
+const BK=K+'_bk',lastBk=()=>{try{return +localStorage.getItem(BK)||0}catch(e){return 0}},markBk=()=>{try{localStorage.setItem(BK,Date.now())}catch(e){}};
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 const today=()=>new Date().toISOString().slice(0,10),full=s=>s.n+' '+s.p;
 const G=id=>D.groups.find(g=>g.id===id),S=id=>D.students.find(s=>s.id===id),SE=id=>D.sessions.find(s=>s.id===id);
 const gn=id=>G(id)?G(id).name:'—';
@@ -115,9 +117,10 @@ function showQ(id){const s=S(id);$('mn').textContent=full(s);mkQ($('qr'),s.id,22
 /* ---------- Séances ---------- */
 function vS(){
  if(!D.groups.length){$('v').innerHTML='<p class="mu">Crée d’abord un groupe.</p>';return}
- $('v').innerHTML=`<div class="card"><select id="sg">${gopts('')}</select><div class="row"><input id="sd" type="date" value="${today()}"><select id="sm">${opts(MAT)}</select></div><button class="p" onclick="newSess()">Nouvelle séance</button></div>`+
+ $('v').innerHTML=bkWarn()+`<div class="card"><select id="sg">${gopts('')}</select><div class="row"><input id="sd" type="date" value="${today()}"><select id="sm">${opts(MAT)}</select></div><button class="p" onclick="newSess()">Nouvelle séance</button></div>`+
  D.sessions.slice().sort((a,b)=>b.d.localeCompare(a.d)).map(x=>`<div class="card it" onclick="sid='${x.id}';render()"><div><b>${x.d} · ${esc(x.m)}</b><div class="mu">${esc(gn(x.g))}</div></div><span class="bd">${x.att.length} présent${x.att.length>1?'s':''}</span></div>`).join('');
 }
+function bkWarn(){const l=lastBk(),d=l?Math.floor((Date.now()-l)/864e5):-1;if(!D.students.length||(l&&d<7))return'';return `<div class="banner e" onclick="tab='x';render()">⚠ ${l?'Dernière sauvegarde il y a '+d+' jours':'Aucune sauvegarde'} — touche pour sauvegarder</div>`}
 function newSess(){const x={id:uid(),g:$('sg').value,d:$('sd').value||today(),m:$('sm').value,att:[]};D.sessions.push(x);save();sid=x.id;render()}
 function vSess(){
  const x=SE(sid);if(!x){sid='';return render()}
@@ -160,18 +163,29 @@ function genCSV(){return 'nom;prenom;tel;tel_parent;niveau;section;lycee;groupe;
 function genPay(){return 'date;eleve;montant;nb_seances\n'+D.pays.map(p=>{const s=S(p.s);return [p.d,s?full(s):'?',p.a,p.n].join(';')}).join('\n')}
 function out(t,name,mime){$('o').value=t;$('o').dataset.n=name;$('o').dataset.m=mime}
 function vX(){
- $('v').innerHTML=`<div class="card"><div class="row"><button class="p" onclick="out(genSQL(),'gestion.sql','text/plain')">SQL</button><button onclick="out(genCSV(),'eleves.csv','text/csv')">CSV élèves</button><button onclick="out(genPay(),'paiements.csv','text/csv')">CSV paiements</button><button onclick="out(JSON.stringify(D),'sauvegarde.json','application/json')">JSON</button></div>
+ $('v').innerHTML=`<div class="card"><p><button class="p" onclick="out(genSQL(),'gestion.sql','text/plain');dl()">💾 Sauvegarder maintenant (fichier SQL)</button></p><div class="mu">${lastBk()?'Dernière sauvegarde : '+new Date(lastBk()).toLocaleString('fr-FR'):'Aucune sauvegarde pour le moment.'}</div><div class="row"><button onclick="out(genSQL(),'gestion.sql','text/plain')">SQL</button><button onclick="out(genCSV(),'eleves.csv','text/csv')">CSV élèves</button><button onclick="out(genPay(),'paiements.csv','text/csv')">CSV paiements</button><button onclick="out(JSON.stringify(D),'sauvegarde.json','application/json')">JSON</button></div>
  <textarea id="o" placeholder="Choisis un format : le contenu apparaît ici."></textarea>
  <div class="row"><button onclick="cp()">Copier</button><button onclick="dl()">Télécharger / partager</button></div><div id="xm" class="mu"></div></div>
- <div class="card"><b>Restaurer une sauvegarde JSON</b><textarea id="im" placeholder="Colle ici le JSON"></textarea><button onclick="imp()">Restaurer</button></div>`}
-function cp(){const t=$('o');t.select();try{navigator.clipboard.writeText(t.value).then(()=>$('xm').textContent='Copié.',()=>document.execCommand('copy'))}catch(e){document.execCommand('copy')}}
+ <div class="card"><b>Restaurer une sauvegarde (fichier SQL ou JSON)</b><input type="file" id="fi" accept=".sql,.json,.txt" onchange="rf(this)"><textarea id="im" placeholder="Ou colle ici le contenu du fichier"></textarea><button onclick="imp()">Restaurer</button></div>`}
+function cp(){const t=$('o');t.select();try{navigator.clipboard.writeText(t.value).then(()=>{$('xm').textContent='Copié.';markBk()},()=>document.execCommand('copy'))}catch(e){document.execCommand('copy')}}
 async function dl(){
  const t=$('o'),n=t.dataset.n||'export.txt';if(!t.value)return;
  const f=new File([t.value],n,{type:t.dataset.m||'text/plain'});
- try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:n});return}}catch(e){}
- try{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=n;document.body.appendChild(a);a.click();a.remove();$('xm').textContent='Si rien ne se télécharge, utilise « Copier » et colle dans un fichier.'}catch(e){$('xm').textContent='Utilise « Copier ».'}
+ try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:n});markBk();return}}catch(e){}
+ try{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=n;document.body.appendChild(a);a.click();a.remove();markBk();$('xm').textContent='Si rien ne se télécharge, utilise « Copier » et colle dans un fichier.'}catch(e){$('xm').textContent='Utilise « Copier ».'}
 }
-function imp(){try{const j=JSON.parse($('im').value);if(!j.groups||!j.students)throw 0;if(!confirm('Remplacer toutes les données actuelles ?'))return;D=Object.assign({groups:[],students:[],sessions:[],pays:[]},j);save();alert('Données restaurées');tab='s';render()}catch(e){alert('JSON invalide')}}
+function rf(el){const f=el.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$('im').value=r.result};r.readAsText(f)}
+function pv(s){const o=[];let i=0;while(i<s.length){const c=s[i];if(c==="'"){let v='';i++;while(i<s.length){if(s[i]==="'"){if(s[i+1]==="'"){v+="'";i+=2;continue}i++;break}v+=s[i++]}o.push(v)}else if(c===','||c===' '){i++}else{let j=i;while(j<s.length&&s[j]!==',')j++;o.push(parseFloat(s.slice(i,j)));i=j}}return o}
+function fromSQL(t){
+ const R={groups:[],students:[],sessions:[],pays:[]};let n=0;
+ t.split(/\r?\n/).forEach(l=>{const m=l.match(/^INSERT INTO (\w+) VALUES\((.*)\);\s*$/);if(!m)return;const v=pv(m[2]);n++;
+  if(m[1]==='groupes')R.groups.push({id:v[0],name:v[1],h:v[2]});
+  else if(m[1]==='eleves')R.students.push({id:v[0],n:v[1],p:v[2],t:v[3],tp:v[4],niv:v[5],sec:v[6],ly:v[7],g:v[8],m:v[9]?v[9].split(','):[]});
+  else if(m[1]==='seances')R.sessions.push({id:v[0],g:v[1],d:v[2],m:v[3],att:[]});
+  else if(m[1]==='presences'){const x=R.sessions.find(z=>z.id===v[0]);if(x)x.att.push(v[1])}
+  else if(m[1]==='paiements')R.pays.push({id:v[0],s:v[1],d:v[2],a:v[3],n:v[4]})});
+ if(!n)throw 0;return R}
+function imp(){try{const t=$('im').value.trim();const j=t[0]==='{'?JSON.parse(t):fromSQL(t);if(!j.groups||!j.students)throw 0;if(!confirm('Remplacer toutes les données actuelles ?'))return;D=Object.assign({groups:[],students:[],sessions:[],pays:[]},j);save();alert('Données restaurées');tab='s';render()}catch(e){alert('Fichier non reconnu (SQL ou JSON de cette application)')}}
 render();
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}))}
 </script></body></html>
