@@ -59,7 +59,7 @@ try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}ca
 const today=()=>new Date().toISOString().slice(0,10),full=s=>s.n+' '+s.p;
 const G=id=>D.groups.find(g=>g.id===id),S=id=>D.students.find(s=>s.id===id),SE=id=>D.sessions.find(s=>s.id===id);
 const gn=id=>G(id)?G(id).name:'—';
-const att=s=>D.sessions.filter(x=>x.att.includes(s.id)).length,paid=s=>D.pays.filter(p=>p.s===s.id).reduce((a,p)=>a+p.n,0),unp=s=>Math.max(0,att(s)-paid(s));
+const att=s=>D.sessions.filter(x=>x.att.includes(s.id)).length+(+s.sd||0),paid=s=>D.pays.filter(p=>p.s===s.id).reduce((a,p)=>a+p.n,0),unp=s=>Math.max(0,att(s)-paid(s));
 const opts=(a,v)=>a.map(x=>`<option${x===v?' selected':''}>${x}</option>`).join('');
 const gopts=(v,all)=>(all?`<option value="">Tous les groupes</option>`:'')+D.groups.map(g=>`<option value="${g.id}"${g.id===v?' selected':''}>${esc(g.name)}</option>`).join('');
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{stop();tab=b.dataset.t;sid='';stu='';render()});
@@ -80,20 +80,21 @@ function delG(id){if(!confirm('Supprimer ce groupe ? Ses élèves resteront sans
 function vE(){
  const L=D.students.filter(s=>!fg||s.g===fg);
  $('v').innerHTML=`<div class="row"><select onchange="fg=this.value;vE()">${gopts(fg,1)}</select><button class="p" onclick="stu='new';draft=null;render()">＋ Élève</button></div>
- <div class="row noprint"><button onclick="cards()">Cartes QR à imprimer</button></div><div id="cs"></div>`+
+ <div class="row noprint"><button onclick="cards()">Cartes QR à imprimer</button><button onclick="bulkSd()">Séances de départ du groupe</button></div><div id="cs"></div>`+
  L.map(s=>{const u=unp(s);return `<div class="card it" onclick="stu='${s.id}';render()"><div><b>${esc(full(s))}</b><div class="mu">${esc(s.niv)} ${esc(s.sec)} · ${esc(gn(s.g))}</div></div><span class="bd${u?' w':''}">${u} non payée${u>1?'s':''}</span></div>`}).join('')||'<p class="mu">Aucun élève.</p>';
 }
+function bulkSd(){const L=D.students.filter(s=>!fg||s.g===fg);if(!L.length)return;const v=prompt('Nombre de séances de départ pour ces '+L.length+' élèves :','0');if(v===null)return;const n=Math.max(0,parseInt(v)||0);L.forEach(s=>s.sd=n);save();vE()}
 function cards(){const L=D.students.filter(s=>!fg||s.g===fg);$('cs').innerHTML='<button class="noprint" onclick="window.print()">Imprimer</button><div class="cards">'+L.map(s=>`<div class="qc"><div class="q" id="q${s.id}"></div><b>${esc(full(s))}</b><div>${esc(gn(s.g))}</div></div>`).join('')+'</div>';L.forEach(s=>mkQ($('q'+s.id),s.id,110))}
 function mkQ(el,t,sz){el.innerHTML='';try{new QRCode(el,{text:t,width:sz,height:sz})}catch(e){el.textContent='QR indisponible'}}
 const fld=(i,l,v,t)=>`<label class="mu">${l}</label><input id="${i}" type="${t||'text'}" value="${esc(v)}">`;
 function vSheet(){
- const nw=stu==='new';if(nw&&!draft)draft={id:uid(),n:'',p:'',t:'',tp:'',niv:NIV[0],sec:SEC[0],ly:'',g:D.groups[0]?D.groups[0].id:'',m:[]};
+ const nw=stu==='new';if(nw&&!draft)draft={id:uid(),n:'',p:'',t:'',tp:'',niv:NIV[0],sec:SEC[0],ly:'',sd:0,g:D.groups[0]?D.groups[0].id:'',m:[]};
  const s=nw?draft:S(stu);if(!s){stu='';return render()}
  let h=`<button onclick="stu='';draft=null;render()">← Retour</button>`;
- if(!nw){const u=unp(s);h+=`<div class="card"><div class="big" style="color:var(--${u?'or':'ac'})">${u} séance${u>1?'s':''} non payée${u>1?'s':''}</div><div class="mu">${att(s)} séance(s) suivie(s) · ${paid(s)} payée(s)</div></div>`}
+ if(!nw){const u=unp(s);h+=`<div class="card"><div class="big" style="color:var(--${u?'or':'ac'})">${u} séance${u>1?'s':''} non payée${u>1?'s':''}</div><div class="mu">${att(s)} séance(s) suivie(s)${s.sd?' (dont '+s.sd+' de départ)':''} · ${paid(s)} payée(s)</div></div>`}
  h+=`<div class="card">${fld('f_n','Nom',s.n)}${fld('f_p','Prénom',s.p)}${fld('f_t','Téléphone',s.t,'tel')}${fld('f_tp','Téléphone du parent',s.tp,'tel')}
  <div class="row"><div><label class="mu">Niveau</label><select id="f_niv">${opts(NIV,s.niv)}</select></div><div><label class="mu">Section</label><select id="f_sec">${opts(SEC,s.sec)}</select></div></div>
- ${fld('f_ly','Lycée',s.ly)}<label class="mu">Groupe (modifiable à tout moment)</label><select id="f_g"><option value="">—</option>${gopts(s.g)}</select>
+ ${fld('f_ly','Lycée',s.ly)}${fld('f_sd','Séances déjà faites avant l’application (séances de départ)',s.sd||0,'number')}<label class="mu">Groupe (modifiable à tout moment)</label><select id="f_g"><option value="">—</option>${gopts(s.g)}</select>
  <label class="mu">Matière(s) suivie(s)</label><div class="ck">${MAT.map(m=>`<label><input type="checkbox" value="${m}"${s.m.includes(m)?' checked':''}>${m}</label>`).join('')}</div>
  <p><button class="p" onclick="saveS()">Enregistrer</button></p></div>`;
  if(!nw){
@@ -106,7 +107,7 @@ function vSheet(){
 function saveS(){
  const nw=stu==='new',s=nw?draft:S(stu),g=i=>$(i).value.trim();
  if(!g('f_n')&&!g('f_p'))return alert('Saisis au moins un nom ou un prénom.');
- Object.assign(s,{n:g('f_n'),p:g('f_p'),t:g('f_t'),tp:g('f_tp'),niv:$('f_niv').value,sec:$('f_sec').value,ly:g('f_ly'),g:$('f_g').value,m:[...document.querySelectorAll('.ck input:checked')].map(c=>c.value)});
+ Object.assign(s,{n:g('f_n'),p:g('f_p'),t:g('f_t'),tp:g('f_tp'),niv:$('f_niv').value,sec:$('f_sec').value,ly:g('f_ly'),sd:Math.max(0,parseInt(g('f_sd'))||0),g:$('f_g').value,m:[...document.querySelectorAll('.ck input:checked')].map(c=>c.value)});
  if(nw){D.students.push(s);draft=null}
  save();stu='';render();
 }
@@ -154,12 +155,12 @@ function onScan(t){
 /* ---------- Export ---------- */
 const q=s=>"'"+String(s==null?'':s).replace(/'/g,"''")+"'";
 function genSQL(){
- let o='CREATE TABLE groupes(id TEXT PRIMARY KEY,nom TEXT,horaire TEXT);\nCREATE TABLE eleves(id TEXT PRIMARY KEY,nom TEXT,prenom TEXT,tel TEXT,tel_parent TEXT,niveau TEXT,section TEXT,lycee TEXT,groupe_id TEXT,matieres TEXT);\nCREATE TABLE seances(id TEXT PRIMARY KEY,groupe_id TEXT,date TEXT,matiere TEXT);\nCREATE TABLE presences(seance_id TEXT,eleve_id TEXT);\nCREATE TABLE paiements(id TEXT PRIMARY KEY,eleve_id TEXT,date TEXT,montant REAL,nb_seances INTEGER);\n';
+ let o='CREATE TABLE groupes(id TEXT PRIMARY KEY,nom TEXT,horaire TEXT);\nCREATE TABLE eleves(id TEXT PRIMARY KEY,nom TEXT,prenom TEXT,tel TEXT,tel_parent TEXT,niveau TEXT,section TEXT,lycee TEXT,groupe_id TEXT,matieres TEXT,seances_depart INTEGER);\nCREATE TABLE seances(id TEXT PRIMARY KEY,groupe_id TEXT,date TEXT,matiere TEXT);\nCREATE TABLE presences(seance_id TEXT,eleve_id TEXT);\nCREATE TABLE paiements(id TEXT PRIMARY KEY,eleve_id TEXT,date TEXT,montant REAL,nb_seances INTEGER);\n';
  D.groups.forEach(g=>o+=`INSERT INTO groupes VALUES(${q(g.id)},${q(g.name)},${q(g.h)});\n`);
- D.students.forEach(s=>o+=`INSERT INTO eleves VALUES(${q(s.id)},${q(s.n)},${q(s.p)},${q(s.t)},${q(s.tp)},${q(s.niv)},${q(s.sec)},${q(s.ly)},${q(s.g)},${q(s.m.join(','))});\n`);
+ D.students.forEach(s=>o+=`INSERT INTO eleves VALUES(${q(s.id)},${q(s.n)},${q(s.p)},${q(s.t)},${q(s.tp)},${q(s.niv)},${q(s.sec)},${q(s.ly)},${q(s.g)},${q(s.m.join(','))},${s.sd||0});\n`);
  D.sessions.forEach(x=>{o+=`INSERT INTO seances VALUES(${q(x.id)},${q(x.g)},${q(x.d)},${q(x.m)});\n`;x.att.forEach(a=>o+=`INSERT INTO presences VALUES(${q(x.id)},${q(a)});\n`)});
  D.pays.forEach(p=>o+=`INSERT INTO paiements VALUES(${q(p.id)},${q(p.s)},${q(p.d)},${p.a},${p.n});\n`);return o}
-function genCSV(){return 'nom;prenom;tel;tel_parent;niveau;section;lycee;groupe;matieres;seances_suivies;seances_payees;non_payees\n'+D.students.map(s=>[s.n,s.p,s.t,s.tp,s.niv,s.sec,s.ly,gn(s.g),s.m.join('+'),att(s),paid(s),unp(s)].join(';')).join('\n')}
+function genCSV(){return 'nom;prenom;tel;tel_parent;niveau;section;lycee;groupe;matieres;seances_depart;seances_suivies;seances_payees;non_payees\n'+D.students.map(s=>[s.n,s.p,s.t,s.tp,s.niv,s.sec,s.ly,gn(s.g),s.m.join('+'),s.sd||0,att(s),paid(s),unp(s)].join(';')).join('\n')}
 function genPay(){return 'date;eleve;montant;nb_seances\n'+D.pays.map(p=>{const s=S(p.s);return [p.d,s?full(s):'?',p.a,p.n].join(';')}).join('\n')}
 function out(t,name,mime){$('o').value=t;$('o').dataset.n=name;$('o').dataset.m=mime}
 function vX(){
@@ -180,7 +181,7 @@ function fromSQL(t){
  const R={groups:[],students:[],sessions:[],pays:[]};let n=0;
  t.split(/\r?\n/).forEach(l=>{const m=l.match(/^INSERT INTO (\w+) VALUES\((.*)\);\s*$/);if(!m)return;const v=pv(m[2]);n++;
   if(m[1]==='groupes')R.groups.push({id:v[0],name:v[1],h:v[2]});
-  else if(m[1]==='eleves')R.students.push({id:v[0],n:v[1],p:v[2],t:v[3],tp:v[4],niv:v[5],sec:v[6],ly:v[7],g:v[8],m:v[9]?v[9].split(','):[]});
+  else if(m[1]==='eleves')R.students.push({id:v[0],n:v[1],p:v[2],t:v[3],tp:v[4],niv:v[5],sec:v[6],ly:v[7],g:v[8],m:v[9]?v[9].split(','):[],sd:v[10]||0});
   else if(m[1]==='seances')R.sessions.push({id:v[0],g:v[1],d:v[2],m:v[3],att:[]});
   else if(m[1]==='presences'){const x=R.sessions.find(z=>z.id===v[0]);if(x)x.att.push(v[1])}
   else if(m[1]==='paiements')R.pays.push({id:v[0],s:v[1],d:v[2],a:v[3],n:v[4]})});
