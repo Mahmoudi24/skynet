@@ -21,6 +21,7 @@ main{max-width:640px;margin:0 auto;padding:14px}
 h1{font-size:20px;margin:4px 0 12px}h2{font-size:16px;margin:16px 0 6px}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin:8px 0}
 input,select,textarea,button{font:inherit;color:var(--tx)}
+input[type=color]{height:44px;padding:2px}
 input,select,textarea{width:100%;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);margin:3px 0}
 textarea{min-height:130px;font:12px/1.4 ui-monospace,monospace}
 button{padding:10px 14px;border:1px solid var(--bd);border-radius:8px;background:var(--card);cursor:pointer}
@@ -49,15 +50,18 @@ nav button.on{color:var(--ac);font-weight:600;box-shadow:inset 0 2px var(--ac)}
 <div id="modal"><div class="box"><b id="mn"></b><div id="qr"></div><button onclick="document.getElementById('modal').style.display='none'">Fermer</button></div></div>
 <script>
 const K='gestion_v2',SEC=['info','sciences','math','technique'],MAT=['informatique','programmation','sti'],NIV=['2ème','3ème','4ème'];
-let D={groups:[],students:[],sessions:[],pays:[]},tab='s',sid='',stu='',fg='',scanner=null,draft=null;
+let D={groups:[],students:[],sessions:[],pays:[]},tab='s',sid='',stu='',fg='',fq='',eg='',scanner=null,draft=null;
 try{const s=localStorage.getItem(K);if(s)D=Object.assign(D,JSON.parse(s))}catch(e){}
 const $=i=>document.getElementById(i),uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const save=()=>{try{localStorage.setItem(K,JSON.stringify(D))}catch(e){}};
 const BK=K+'_bk',lastBk=()=>{try{return +localStorage.getItem(BK)||0}catch(e){return 0}},markBk=()=>{try{localStorage.setItem(BK,Date.now())}catch(e){}};
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 const today=()=>new Date().toISOString().slice(0,10),full=s=>s.n+' '+s.p;
 const G=id=>D.groups.find(g=>g.id===id),S=id=>D.students.find(s=>s.id===id),SE=id=>D.sessions.find(s=>s.id===id);
+const gs=id=>{const g=G(id);return g&&g.c?`style="background:${g.c}2e;border-left:6px solid ${g.c}"`:''};
+const PAL=['#1f6f5c','#2f6fb5','#b5532f','#8a4fb0','#b08a1f','#c2417a','#2f9aa8','#6b8e23'];
 const gn=id=>G(id)?G(id).name:'—';
 const att=s=>D.sessions.filter(x=>x.att.includes(s.id)).length+(+s.sd||0),paid=s=>D.pays.filter(p=>p.s===s.id).reduce((a,p)=>a+p.n,0),unp=s=>att(s)-paid(s);
 const lab=u=>u<0?'avance de '+(-u):u+' non payée'+(u>1?'s':'');
@@ -72,17 +76,21 @@ function render(){
 }
 /* ---------- Groupes ---------- */
 function vG(){
- $('v').innerHTML=`<div class="card"><input id="gn" placeholder="Nom du groupe (ex. 3ème info – A)"><input id="gh" placeholder="Jour et horaire (ex. Samedi 10h)"><button class="p" onclick="addG()">Ajouter le groupe</button></div>`+
- (D.groups.map(g=>`<div class="card it"><div><b>${esc(g.name)}</b><div class="mu">${esc(g.h||'')} · ${D.students.filter(s=>s.g===g.id).length} élèves</div></div><button class="d" onclick="delG('${g.id}')">✕</button></div>`).join('')||'<p class="mu">Aucun groupe.</p>');
+ $('v').innerHTML=`<div class="card"><input id="gn" placeholder="Nom du groupe (ex. 3ème info – A)"><input id="gh" placeholder="Jour et horaire (ex. Samedi 10h)"><label class="mu">Couleur du groupe</label><input id="gc" type="color" value="${PAL[D.groups.length%PAL.length]}"><button class="p" onclick="addG()">Ajouter le groupe</button></div>`+
+ (D.groups.map(g=>eg===g.id?`<div class="card" ${gs(g.id)}><input id="en" value="${esc(g.name)}"><input id="eh" value="${esc(g.h||'')}" placeholder="Jour et horaire"><label class="mu">Couleur</label><input id="ec" type="color" value="${g.c||PAL[0]}"><div class="row"><button class="p" onclick="saveG('${g.id}')">Enregistrer</button><button onclick="eg='';vG()">Annuler</button></div></div>`:`<div class="card it" ${gs(g.id)}><div><b>${esc(g.name)}</b><div class="mu">${esc(g.h||'')} · ${D.students.filter(s=>s.g===g.id).length} élèves</div></div><span class="row"><button onclick="eg='${g.id}';vG()">✎</button><button class="d" onclick="delG('${g.id}')">✕</button></span></div>`).join('')||'<p class="mu">Aucun groupe.</p>');
 }
-function addG(){const n=$('gn').value.trim();if(!n)return;D.groups.push({id:uid(),name:n,h:$('gh').value.trim()});save();render()}
+function addG(){const n=$('gn').value.trim();if(!n)return;D.groups.push({id:uid(),name:n,h:$('gh').value.trim(),c:$('gc').value});save();render()}
+function saveG(id){const g=G(id),n=$('en').value.trim();if(!n)return;g.name=n;g.h=$('eh').value.trim();g.c=$('ec').value;eg='';save();vG()}
 function delG(id){if(!confirm('Supprimer ce groupe ? Ses élèves resteront sans groupe.'))return;D.students.forEach(s=>{if(s.g===id)s.g=''});D.groups=D.groups.filter(g=>g.id!==id);save();render()}
 /* ---------- Élèves ---------- */
 function vE(){
- const L=D.students.filter(s=>!fg||s.g===fg);
- $('v').innerHTML=`<div class="row"><select onchange="fg=this.value;vE()">${gopts(fg,1)}</select><button class="p" onclick="stu='new';draft=null;render()">＋ Élève</button></div>
- <div class="row noprint"><button onclick="cards()">Cartes QR à imprimer</button><button onclick="bulkSd()">Séances de départ du groupe</button></div><div id="cs"></div>`+
- L.map(s=>{const u=unp(s);return `<div class="card it" onclick="stu='${s.id}';render()"><div><b>${esc(full(s))}</b><div class="mu">${esc(s.niv)} ${esc(s.sec)} · ${esc(gn(s.g))}</div></div><span class="bd${u>0?' w':''}">${lab(u)}</span></div>`}).join('')||'<p class="mu">Aucun élève.</p>';
+ $('v').innerHTML=`<div class="row"><select onchange="fg=this.value;listE()">${gopts(fg,1)}</select><button class="p" onclick="stu='new';draft=null;render()">＋ Élève</button></div>
+ <input id="sq" placeholder="🔍 Chercher un élève (nom, prénom, lycée, tel)" value="${esc(fq)}" oninput="fq=this.value;listE()">
+ <div class="row noprint"><button onclick="cards()">Cartes QR à imprimer</button><button onclick="bulkSd()">Séances de départ du groupe</button></div><div id="cs"></div><div id="el"></div>`;listE();
+}
+function listE(){
+ const q=norm(fq),L=D.students.filter(s=>(!fg||s.g===fg)&&(!q||norm([s.n,s.p,s.ly,s.t,s.tp].join(' ')).includes(q)));
+ $('el').innerHTML=`<div class="mu">${L.length} élève(s)</div>`+L.map(s=>{const u=unp(s);return `<div class="card it" ${gs(s.g)} onclick="stu='${s.id}';render()"><div><b>${esc(full(s))}</b><div class="mu">${esc(s.niv)} ${esc(s.sec)} · ${esc(gn(s.g))}</div></div><span class="bd${u>0?' w':''}">${lab(u)}</span></div>`}).join('')||'<p class="mu">Aucun élève.</p>';
 }
 function bulkSd(){const L=D.students.filter(s=>!fg||s.g===fg);if(!L.length)return;const v=prompt('Nombre de séances de départ pour ces '+L.length+' élèves :','0');if(v===null)return;const n=parseInt(v)||0;L.forEach(s=>s.sd=n);save();vE()}
 function cards(){const L=D.students.filter(s=>!fg||s.g===fg);$('cs').innerHTML='<button class="noprint" onclick="window.print()">Imprimer</button><div class="cards">'+L.map(s=>`<div class="qc"><div class="q" id="q${s.id}"></div><b>${esc(full(s))}</b><div>${esc(gn(s.g))}</div></div>`).join('')+'</div>';L.forEach(s=>mkQ($('q'+s.id),s.id,110))}
@@ -93,7 +101,7 @@ function vSheet(){
  const s=nw?draft:S(stu);if(!s){stu='';return render()}
  let h=`<button onclick="stu='';draft=null;render()">← Retour</button>`;
  if(!nw){const u=unp(s);h+=`<div class="card"><div class="big" style="color:var(--${u>0?'or':'ac'})">${u<0?'Avance de '+(-u)+' séance'+(u<-1?'s':''):u+' séance'+(u>1?'s':'')+' non payée'+(u>1?'s':'')}</div><div class="mu">${att(s)} séance(s) suivie(s)${s.sd?' (dont '+s.sd+' de départ)':''} · ${paid(s)} payée(s)</div></div>`}
- h+=`<div class="card">${fld('f_n','Nom',s.n)}${fld('f_p','Prénom',s.p)}${fld('f_t','Téléphone',s.t,'tel')}${fld('f_tp','Téléphone du parent',s.tp,'tel')}
+ h+=`<div class="card" ${gs(s.g)}>${fld('f_n','Nom',s.n)}${fld('f_p','Prénom',s.p)}${fld('f_t','Téléphone',s.t,'tel')}${fld('f_tp','Téléphone du parent',s.tp,'tel')}
  <div class="row"><div><label class="mu">Niveau</label><select id="f_niv">${opts(NIV,s.niv)}</select></div><div><label class="mu">Section</label><select id="f_sec">${opts(SEC,s.sec)}</select></div></div>
  ${fld('f_ly','Lycée',s.ly)}${fld('f_sd','Séances de départ (séances faites avant l’application ; négatif si payé d’avance)',s.sd||0,'number')}<label class="mu">Groupe (modifiable à tout moment)</label><select id="f_g"><option value="">—</option>${gopts(s.g)}</select>
  <label class="mu">Matière(s) suivie(s)</label><div class="ck">${MAT.map(m=>`<label><input type="checkbox" value="${m}"${s.m.includes(m)?' checked':''}>${m}</label>`).join('')}</div>
@@ -120,7 +128,7 @@ function showQ(id){const s=S(id);$('mn').textContent=full(s);mkQ($('qr'),s.id,22
 function vS(){
  if(!D.groups.length){$('v').innerHTML='<p class="mu">Crée d’abord un groupe.</p>';return}
  $('v').innerHTML=bkWarn()+`<div class="card"><select id="sg">${gopts('')}</select><div class="row"><input id="sd" type="date" value="${today()}"><select id="sm">${opts(MAT)}</select></div><button class="p" onclick="newSess()">Nouvelle séance</button></div>`+
- D.sessions.slice().sort((a,b)=>b.d.localeCompare(a.d)).map(x=>`<div class="card it" onclick="sid='${x.id}';render()"><div><b>${x.d} · ${esc(x.m)}</b><div class="mu">${esc(gn(x.g))}</div></div><span class="bd">${x.att.length} présent${x.att.length>1?'s':''}</span></div>`).join('');
+ D.sessions.slice().sort((a,b)=>b.d.localeCompare(a.d)).map(x=>`<div class="card it" ${gs(x.g)} onclick="sid='${x.id}';render()"><div><b>${x.d} · ${esc(x.m)}</b><div class="mu">${esc(gn(x.g))}</div></div><span class="bd">${x.att.length} présent${x.att.length>1?'s':''}</span></div>`).join('');
 }
 function bkWarn(){const l=lastBk(),d=l?Math.floor((Date.now()-l)/864e5):-1;if(!D.students.length||(l&&d<7))return'';return `<div class="banner e" onclick="tab='x';render()">⚠ ${l?'Dernière sauvegarde il y a '+d+' jours':'Aucune sauvegarde'} — touche pour sauvegarder</div>`}
 function newSess(){const x={id:uid(),g:$('sg').value,d:$('sd').value||today(),m:$('sm').value,att:[]};D.sessions.push(x);save();sid=x.id;render()}
@@ -130,9 +138,10 @@ function vSess(){
  <p><b>${x.d} · ${esc(x.m)}</b> <span class="mu">${esc(gn(x.g))}</span></p>
  <div class="row"><button class="p" onclick="start()">📷 Scanner</button><button onclick="stop()">Arrêter</button></div>
  <div id="reader"></div><div id="bn"></div>
- <div class="row"><select id="ms">${D.students.filter(s=>!x.att.includes(s.id)).sort((a,b)=>(b.g===x.g)-(a.g===x.g)).map(s=>`<option value="${s.id}">${esc(full(s))}</option>`).join('')}</select><button onclick="addMan()">Ajouter</button></div><div id="ls"></div>`;list();
+ <input id="mq" placeholder="🔍 Chercher un élève à ajouter…" oninput="fillMs()"><div class="row"><select id="ms"></select><button onclick="addMan()">Ajouter</button></div><div id="ls"></div>`;list();fillMs();
 }
-function list(){const x=SE(sid);$('ls').innerHTML=`<h2>${x.att.length} présent(s)</h2>`+x.att.map(i=>S(i)).filter(Boolean).map(s=>{const u=unp(s);return `<div class="card it"><span>${esc(full(s))} <span class="bd${u>0?' w':''}">${lab(u)}</span></span><button class="d" onclick="rm('${s.id}')">✕</button></div>`}).join('')}
+function list(){const x=SE(sid);$('ls').innerHTML=`<h2>${x.att.length} présent(s)</h2>`+x.att.map(i=>S(i)).filter(Boolean).map(s=>{const u=unp(s);return `<div class="card it" ${gs(s.g)}><span>${esc(full(s))} <span class="bd${u>0?' w':''}">${lab(u)}</span></span><button class="d" onclick="rm('${s.id}')">✕</button></div>`}).join('')}
+function fillMs(){const x=SE(sid),q=norm($('mq').value);$('ms').innerHTML=D.students.filter(s=>!x.att.includes(s.id)&&(!q||norm(full(s)+' '+s.ly).includes(q))).sort((a,b)=>(b.g===x.g)-(a.g===x.g)).map(s=>`<option value="${s.id}">${esc(full(s))} — ${esc(gn(s.g))}</option>`).join('')}
 function addMan(){const i=$('ms').value;if(i){add(i);vSess()}}
 function add(i){const x=SE(sid);if(!x.att.includes(i)){x.att.push(i);save()}}
 function rm(i){const x=SE(sid);x.att=x.att.filter(a=>a!==i);save();vSess()}
@@ -156,8 +165,8 @@ function onScan(t){
 /* ---------- Export ---------- */
 const q=s=>"'"+String(s==null?'':s).replace(/'/g,"''")+"'";
 function genSQL(){
- let o='CREATE TABLE groupes(id TEXT PRIMARY KEY,nom TEXT,horaire TEXT);\nCREATE TABLE eleves(id TEXT PRIMARY KEY,nom TEXT,prenom TEXT,tel TEXT,tel_parent TEXT,niveau TEXT,section TEXT,lycee TEXT,groupe_id TEXT,matieres TEXT,seances_depart INTEGER);\nCREATE TABLE seances(id TEXT PRIMARY KEY,groupe_id TEXT,date TEXT,matiere TEXT);\nCREATE TABLE presences(seance_id TEXT,eleve_id TEXT);\nCREATE TABLE paiements(id TEXT PRIMARY KEY,eleve_id TEXT,date TEXT,montant REAL,nb_seances INTEGER);\n';
- D.groups.forEach(g=>o+=`INSERT INTO groupes VALUES(${q(g.id)},${q(g.name)},${q(g.h)});\n`);
+ let o='CREATE TABLE groupes(id TEXT PRIMARY KEY,nom TEXT,horaire TEXT,couleur TEXT);\nCREATE TABLE eleves(id TEXT PRIMARY KEY,nom TEXT,prenom TEXT,tel TEXT,tel_parent TEXT,niveau TEXT,section TEXT,lycee TEXT,groupe_id TEXT,matieres TEXT,seances_depart INTEGER);\nCREATE TABLE seances(id TEXT PRIMARY KEY,groupe_id TEXT,date TEXT,matiere TEXT);\nCREATE TABLE presences(seance_id TEXT,eleve_id TEXT);\nCREATE TABLE paiements(id TEXT PRIMARY KEY,eleve_id TEXT,date TEXT,montant REAL,nb_seances INTEGER);\n';
+ D.groups.forEach(g=>o+=`INSERT INTO groupes VALUES(${q(g.id)},${q(g.name)},${q(g.h)},${q(g.c)});\n`);
  D.students.forEach(s=>o+=`INSERT INTO eleves VALUES(${q(s.id)},${q(s.n)},${q(s.p)},${q(s.t)},${q(s.tp)},${q(s.niv)},${q(s.sec)},${q(s.ly)},${q(s.g)},${q(s.m.join(','))},${s.sd||0});\n`);
  D.sessions.forEach(x=>{o+=`INSERT INTO seances VALUES(${q(x.id)},${q(x.g)},${q(x.d)},${q(x.m)});\n`;x.att.forEach(a=>o+=`INSERT INTO presences VALUES(${q(x.id)},${q(a)});\n`)});
  D.pays.forEach(p=>o+=`INSERT INTO paiements VALUES(${q(p.id)},${q(p.s)},${q(p.d)},${p.a},${p.n});\n`);return o}
@@ -181,7 +190,7 @@ function pv(s){const o=[];let i=0;while(i<s.length){const c=s[i];if(c==="'"){let
 function fromSQL(t){
  const R={groups:[],students:[],sessions:[],pays:[]};let n=0;
  t.split(/\r?\n/).forEach(l=>{const m=l.match(/^INSERT INTO (\w+) VALUES\((.*)\);\s*$/);if(!m)return;const v=pv(m[2]);n++;
-  if(m[1]==='groupes')R.groups.push({id:v[0],name:v[1],h:v[2]});
+  if(m[1]==='groupes')R.groups.push({id:v[0],name:v[1],h:v[2],c:v[3]||''});
   else if(m[1]==='eleves')R.students.push({id:v[0],n:v[1],p:v[2],t:v[3],tp:v[4],niv:v[5],sec:v[6],ly:v[7],g:v[8],m:v[9]?v[9].split(','):[],sd:v[10]||0});
   else if(m[1]==='seances')R.sessions.push({id:v[0],g:v[1],d:v[2],m:v[3],att:[]});
   else if(m[1]==='presences'){const x=R.sessions.find(z=>z.id===v[0]);if(x)x.att.push(v[1])}
