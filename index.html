@@ -98,7 +98,7 @@ function getAnneeScolaire(date = new Date()) {
 const ELEVE_URL='https://mahmoudi24.github.io/eleves/';
 const FBK='AIzaSyAmoABiUlkb2dOk0ulYprfQHycnxWvNrGk',FBP='eleves-52e55';
 const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}};
-let fb=null,atm=null,ptm=null;
+let fb=null,atm=null,ptm=null,pto=null;
 const K='gestion_v2',SEC=['info','sciences','math','technique'],MAT=['informatique','programmation','sti'],NIV=['2ème','3ème','4ème'];
 let D={groups:[],students:[],sessions:[],pays:[]},tab='s',sid='',stu='',fg='',fq='',eg='',pq='',pf='',pt='',scanner=null,draft=null;
 try{const s=localStorage.getItem(K);if(s)D=Object.assign(D,JSON.parse(s))}catch(e){}
@@ -193,28 +193,29 @@ function vS(){
  D.sessions.slice().sort((a,b)=>b.d.localeCompare(a.d)).map(x=>`<div class="card it" ${gs(x.g)} onclick="sid='${x.id}';render()"><div><b>${x.d} · ${esc(x.m)}</b><div class="mu">${esc(gn(x.g))}</div></div><span class="bd">${x.att.length} présent${x.att.length>1?'s':''}</span></div>`).join('');
 }
 function bkWarn(){const l=lastBk(),d=l?Math.floor((Date.now()-l)/864e5):-1;if(!D.students.length||(l&&d<7))return'';return `<div class="banner e" onclick="tab='x';render()">⚠ ${l?'Dernière sauvegarde il y a '+d+' jours':'Aucune sauvegarde'} — touche pour sauvegarder</div>`}
-function newSess(){const x={id:uid(),g:$('sg').value,d:$('sd').value||today(),m:$('sm').value,att:[]};D.sessions.push(x);save();sid=x.id;render()}
+function newSess(){const x={id:uid(),g:$('sg').value,d:$('sd').value||today(),m:$('sm').value,att:[]};D.sessions.push(x);save();sid=x.id;render();
+ if(fbOn()&&ls(K+'_pub')==='1'&&ls(K+'_open')!=='0')fbOpenSess(x).then(()=>{if(sid===x.id&&!scanner)vSess()}).catch(()=>{})}
 function vSess(){
  const x=SE(sid);if(!x){sid='';return render()}
  $('v').innerHTML=`<button onclick="stop();sid='';render()">← Retour</button> <button class="d" onclick="delSess()">Supprimer la séance</button>
- <p><b>${x.d} · ${esc(x.m)}</b> <span class="mu">${esc(gn(x.g))}</span></p>
+ <p><b>${x.d} · ${esc(x.m)}</b> <span class="mu">${esc(gn(x.g))}</span></p>${partCard(x)}
  <div class="row"><button class="p" onclick="start()">📷 Scanner</button><button onclick="stop()">Arrêter</button></div>
  <div id="reader"></div><div id="bn"></div>
- <input id="mq" placeholder="🔍 Chercher un élève à ajouter…" oninput="fillMs()"><div class="row"><select id="ms"></select><button onclick="addMan()">Ajouter</button></div><div id="ls"></div>`;list();fillMs();
+ <input id="mq" placeholder="🔍 Chercher un élève à ajouter…" oninput="fillMs()"><div class="row"><select id="ms"></select><button onclick="addMan()">Ajouter</button></div><div id="ls"></div>`;list();fillMs();clearInterval(pto);if(x.pub&&fbOn()){pto=setInterval(()=>pullQuiet(),20000);pullQuiet()}
 }
-function list(){const x=SE(sid);$('ls').innerHTML=`<h2>${x.att.length} présent(s)</h2>`+x.att.map(i=>S(i)).filter(Boolean).map(s=>{const u=unp(s);return `<div class="card it" ${gs(s.g)}><span>${esc(full(s))} <span class="bd${u>0?' w':''}">${lab(u)}</span></span><button class="d" onclick="rm('${s.id}')">✕</button></div>`}).join('')}
+function list(){const x=SE(sid);$('ls').innerHTML=`<h2>${x.att.length} présent(s)</h2>`+x.att.map(i=>S(i)).filter(Boolean).map(s=>{const u=unp(s);return `<div class="card it" ${gs(s.g)}><span>${(x.auto||[]).includes(s.id)?'📲 ':''}${esc(full(s))} <span class="bd${u>0?' w':''}">${lab(u)}</span></span><button class="d" onclick="rm('${s.id}')">✕</button></div>`}).join('')}
 function fillMs(){const x=SE(sid),q=norm($('mq').value);$('ms').innerHTML=D.students.filter(s=>!x.att.includes(s.id)&&(!q||norm(full(s)+' '+s.ly).includes(q))).sort((a,b)=>(b.g===x.g)-(a.g===x.g)).map(s=>`<option value="${s.id}">${esc(full(s))} — ${esc(gn(s.g))}</option>`).join('')}
 function addMan(){const i=$('ms').value;if(i){add(i);vSess()}}
 function add(i){const x=SE(sid);if(!x.att.includes(i)){x.att.push(i);save()}}
 function rm(i){const x=SE(sid);x.att=x.att.filter(a=>a!==i);save();vSess()}
-function delSess(){if(confirm('Supprimer cette séance ?')){stop();D.sessions=D.sessions.filter(x=>x.id!==sid);save();sid='';render()}}
+function delSess(){if(confirm('Supprimer cette séance ?')){const y=SE(sid);if(y&&y.pub&&fbOn())fbDelSess(y).catch(()=>{});stop();D.sessions=D.sessions.filter(x=>x.id!==sid);save();sid='';render()}}
 function bn(m,e){$('bn').innerHTML=`<div class="banner${e?' e':''}">${m}</div>`}
 function start(){
  if(scanner)return;
  try{scanner=new Html5Qrcode('reader');scanner.start({facingMode:'environment'},{fps:10,qrbox:220},onScan,()=>{}).catch(()=>{scanner=null;bn('Caméra inaccessible. Autorise-la, ou ajoute les élèves à la main.',1)})}
  catch(e){scanner=null;bn('Scanner indisponible sur cet appareil.',1)}
 }
-function stop(){if(scanner){const s=scanner;scanner=null;s.stop().then(()=>s.clear()).catch(()=>{})}}
+function stop(){clearInterval(pto);if(scanner){const s=scanner;scanner=null;s.stop().then(()=>s.clear()).catch(()=>{})}}
 let last='',lt=0;
 function onScan(t){
  const n=Date.now();if(t===last&&n-lt<2500)return;last=t;lt=n;
@@ -330,6 +331,8 @@ function fbPubCard(){
  return `<div class="card"><b>🎓 Application élève</b><div class="mu">Lien à donner aux élèves : <span style="word-break:break-all;user-select:all">${esc(link)}</span></div><div class="mu">Ton UID (pour les règles Firestore) : <span style="word-break:break-all;user-select:all">${esc(s.uid||'')}</span></div>
  <label style="display:flex;gap:6px;align-items:center;margin:8px 0"><input type="checkbox" style="width:auto"${ls(K+'_pub')==='1'?' checked':''} onchange="togPub(this.checked)"> Publier automatiquement les fiches élèves</label>
  <label style="display:flex;gap:6px;align-items:center;margin:8px 0"><input type="checkbox" style="width:auto"${ls(K+'_amt')==='0'?'':' checked'} onchange="togAmt(this.checked)"> Montrer les montants payés aux élèves</label>
+ <label style="display:flex;gap:6px;align-items:center;margin:8px 0"><input type="checkbox" style="width:auto"${ls(K+'_open')==='0'?'':' checked'} onchange="ls(K+'_open',this.checked?'1':'0')"> Ouvrir la participation à chaque nouvelle séance</label>
+ <label style="display:flex;gap:6px;align-items:center;margin:8px 0"><input type="checkbox" style="width:auto"${ls(K+'_code')==='0'?'':' checked'} onchange="ls(K+'_code',this.checked?'1':'0')"> Exiger un code de présence (à écrire au tableau)</label>
  <button class="p" onclick="pubNow()">📤 Publier maintenant</button><div class="mu">${pt?'Dernière publication : '+new Date(pt).toLocaleString('fr-FR'):'Pas encore publié.'}</div><div id="pbm"></div></div>`}
 function annCard(){
  if(!fbOn())return `<div class="card"><b>📢 Annonces aux élèves</b><div class="mu">Connecte-toi dans l’onglet Export pour publier des annonces.</div></div>`;
@@ -348,6 +351,28 @@ async function annList(){
  try{const t=await fbTok(),r=await fbReq('GET',DBU()+'/annonces?pageSize=20&orderBy='+encodeURIComponent('cree desc'),t);
  b.innerHTML=(r.documents||[]).map(d=>{const f=d.fields||{},v=k=>f[k]&&f[k].stringValue||'',id=d.name.split('/').pop();return `<div class="it"><div><b>${v('type')==='devoir'?'📝':'📢'} ${esc(v('titre'))}</b><div class="mu">${v('cible')==='all'?'Tous':esc(gn(v('cible')))} · ${f.cree?new Date(f.cree.timestampValue).toLocaleDateString('fr-FR'):''}${v('limite')?' · pour le '+v('limite'):''}</div></div><button class="d" onclick="delAnn('${id}')">✕</button></div>`}).join('')||'<div class="mu">Aucune annonce.</div>'}catch(e){b.innerHTML=`<div class="banner e">${esc(e.message)}</div>`}}
 async function delAnn(id){if(confirm('Supprimer cette annonce ?'))try{await fbReq('DELETE',DBU()+'/annonces/'+id,await fbTok());annList()}catch(e){annMsg(e.message,1)}}
+/* ---- participation des élèves ---- */
+const rnd4=()=>String(1000+Math.floor(Math.random()*9000));
+async function fbOpenSess(x){
+ const t=await fbTok(),g=G(x.g),code=ls(K+'_code')==='0'?'':rnd4();
+ const f=toFS({g:x.g,gn:g?g.name:'',gh:g?(g.h||''):'',d:x.d,m:x.m,ouvert:true,cc:!!code}).mapValue.fields;
+ f.deb={timestampValue:new Date(x.d+'T00:00:00').toISOString()};f.exp={timestampValue:new Date(x.d+'T23:59:59').toISOString()};
+ await fbReq('POST',DBU()+':commit',t,{writes:[{update:{name:dbp()+'/seances/'+x.id,fields:f}},{update:{name:dbp()+'/codes/'+x.id,fields:{code:{stringValue:code}}}}]});
+ x.pub=1;x.code=code;save()}
+async function fbCloseSess(x){const t=await fbTok();await fbReq('POST',DBU()+':commit',t,{writes:[{update:{name:dbp()+'/seances/'+x.id,fields:{ouvert:{booleanValue:false}}},updateMask:{fieldPaths:['ouvert']}}]});x.pub=0;save()}
+async function fbDelSess(x){const t=await fbTok();await fbReq('POST',DBU()+':commit',t,{writes:[{delete:dbp()+'/seances/'+x.id},{delete:dbp()+'/codes/'+x.id}]})}
+async function fbPull(x){
+ const t=await fbTok(),r=await fbReq('POST',DBU()+':runQuery',t,{structuredQuery:{from:[{collectionId:'participations'}],where:{fieldFilter:{field:{fieldPath:'sid'},op:'EQUAL',value:{stringValue:x.id}}},limit:300}});
+ let n=0;(Array.isArray(r)?r:[]).forEach(e=>{if(!e.document)return;const i=e.document.fields.s.stringValue;if(S(i)&&!x.att.includes(i)){x.att.push(i);x.auto=(x.auto||[]).concat(i);n++}});
+ if(n)save();return n}
+function partCard(x){
+ if(!fbOn()||ls(K+'_pub')!=='1')return'';
+ return x.pub?`<div class="card"><b>📲 Participation ouverte aux élèves</b>${x.code?`<div class="big" style="letter-spacing:4px">Code : ${esc(x.code)}</div><div class="mu">Écris ce code au tableau : les élèves le saisissent pour participer.</div>`:'<div class="mu">Sans code : les élèves du groupe peuvent participer depuis leur application.</div>'}<div class="row"><button onclick="pullNow()">⬇ Récupérer les participations</button><button class="d" onclick="closeSess()">Fermer</button></div><div id="sm"></div></div>`:`<div class="card"><b>📲 Participation des élèves</b><div class="mu">Les élèves de ce groupe pourront participer depuis leur application.</div><button class="p" onclick="openSess()">Ouvrir la participation</button><div id="sm"></div></div>`}
+function smsg(m,e){const z=$('sm');if(z)z.innerHTML=`<div class="banner${e?' e':''}">${esc(m)}</div>`}
+async function openSess(){const x=SE(sid);smsg('Ouverture…');try{await fbOpenSess(x);vSess()}catch(e){smsg(e.message,1)}}
+async function closeSess(){const x=SE(sid);if(!confirm('Fermer la participation ? Les élèves ne pourront plus participer.'))return;try{await fbCloseSess(x);vSess()}catch(e){smsg(e.message,1)}}
+async function pullNow(){smsg('Récupération…');await pullQuiet(1)}
+async function pullQuiet(v){const x=SE(sid);if(!x||!x.pub||!fbOn())return;try{const n=await fbPull(x);if(n||v){list();fillMs();if(v)smsg(n?'✓ '+n+' participation(s) ajoutée(s)':'Aucune nouvelle participation')}}catch(e){if(v)smsg(e.message,1)}}
 /*PUB-END*/
 function vX(){
  $('v').innerHTML=fbCard()+fbPubCard()+`<div class="card"><p><button class="p" onclick="out(genSQL(),'gestion.sql','text/plain');dl()">💾 Sauvegarder maintenant (fichier SQL)</button></p><div class="mu">${lastBk()?'Dernière sauvegarde : '+new Date(lastBk()).toLocaleString('fr-FR'):'Aucune sauvegarde pour le moment.'}</div><div class="row"><button onclick="out(genSQL(),'gestion.sql','text/plain')">SQL</button><button onclick="out(genCSV(),'eleves.csv','text/csv')">CSV élèves</button><button onclick="out(genPay(),'paiements.csv','text/csv')">CSV paiements</button><button onclick="out(JSON.stringify(D),'sauvegarde.json','application/json')">JSON</button></div>
