@@ -95,16 +95,17 @@ function getAnneeScolaire(date = new Date()) {
     statut: 'active'
   };
 }
+const ELEVE_URL='https://mahmoudi24.github.io/eleves/';
 const FBK='AIzaSyAmoABiUlkb2dOk0ulYprfQHycnxWvNrGk',FBP='eleves-52e55';
 const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}};
-let fb=null,atm=null;
+let fb=null,atm=null,ptm=null;
 const K='gestion_v2',SEC=['info','sciences','math','technique'],MAT=['informatique','programmation','sti'],NIV=['2ème','3ème','4ème'];
 let D={groups:[],students:[],sessions:[],pays:[]},tab='s',sid='',stu='',fg='',fq='',eg='',pq='',pf='',pt='',scanner=null,draft=null;
 try{const s=localStorage.getItem(K);if(s)D=Object.assign(D,JSON.parse(s))}catch(e){}
 const $=i=>document.getElementById(i),uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
 const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const save=()=>{try{localStorage.setItem(K,JSON.stringify(D))}catch(e){}autoBk()};
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(D))}catch(e){}autoBk();autoPub()};
 const BK=K+'_bk',lastBk=()=>{try{return +localStorage.getItem(BK)||0}catch(e){return 0}},markBk=()=>{try{localStorage.setItem(BK,Date.now())}catch(e){}};
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 const today=()=>new Date().toISOString().slice(0,10),full=s=>s.n+' '+s.p;
@@ -125,8 +126,8 @@ function render(){
 }
 /* ---------- Groupes ---------- */
 function vG(){
- $('v').innerHTML=`<div class="card"><input id="gn" placeholder="Nom du groupe (ex. 3ème info – A)"><input id="gh" placeholder="Jour et horaire (ex. Samedi 10h)"><label class="mu">Couleur du groupe</label><input id="gc" type="color" value="${PAL[D.groups.length%PAL.length]}"><button class="p" onclick="addG()">Ajouter le groupe</button></div>`+
- (D.groups.map(g=>eg===g.id?`<div class="card" ${gs(g.id)}><input id="en" value="${esc(g.name)}"><input id="eh" value="${esc(g.h||'')}" placeholder="Jour et horaire"><label class="mu">Couleur</label><input id="ec" type="color" value="${g.c||PAL[0]}"><div class="row"><button class="p" onclick="saveG('${g.id}')">Enregistrer</button><button onclick="eg='';vG()">Annuler</button></div></div>`:`<div class="card it" ${gs(g.id)}><div><b>${esc(g.name)}</b><div class="mu">${esc(g.h||'')} · ${D.students.filter(s=>s.g===g.id).length} élèves</div></div><span class="row"><button onclick="eg='${g.id}';vG()">✎</button><button class="d" onclick="delG('${g.id}')">✕</button></span></div>`).join('')||'<p class="mu">Aucun groupe.</p>');
+ $('v').innerHTML=annCard()+`<div class="card"><input id="gn" placeholder="Nom du groupe (ex. 3ème info – A)"><input id="gh" placeholder="Jour et horaire (ex. Samedi 10h)"><label class="mu">Couleur du groupe</label><input id="gc" type="color" value="${PAL[D.groups.length%PAL.length]}"><button class="p" onclick="addG()">Ajouter le groupe</button></div>`+
+ (D.groups.map(g=>eg===g.id?`<div class="card" ${gs(g.id)}><input id="en" value="${esc(g.name)}"><input id="eh" value="${esc(g.h||'')}" placeholder="Jour et horaire"><label class="mu">Couleur</label><input id="ec" type="color" value="${g.c||PAL[0]}"><div class="row"><button class="p" onclick="saveG('${g.id}')">Enregistrer</button><button onclick="eg='';vG()">Annuler</button></div></div>`:`<div class="card it" ${gs(g.id)}><div><b>${esc(g.name)}</b><div class="mu">${esc(g.h||'')} · ${D.students.filter(s=>s.g===g.id).length} élèves</div></div><span class="row"><button onclick="eg='${g.id}';vG()">✎</button><button class="d" onclick="delG('${g.id}')">✕</button></span></div>`).join('')||'<p class="mu">Aucun groupe.</p>');annList();
 }
 function addG(){const n=$('gn').value.trim();if(!n)return;D.groups.push({id:uid(),name:n,h:$('gh').value.trim(),c:$('gc').value});save();render()}
 function saveG(id){const g=G(id),n=$('en').value.trim();if(!n)return;g.name=n;g.h=$('eh').value.trim();g.c=$('ec').value;eg='';save();vG()}
@@ -296,8 +297,60 @@ function fbCard(){
  if(!s)return `<div class="card"><b>☁ Sauvegarde en ligne</b><div class="mu">Connecte-toi pour enregistrer tes sauvegardes en ligne, chacune avec sa date.</div><input id="fe" type="email" placeholder="E-mail" autocomplete="username"><input id="fp" type="password" placeholder="Mot de passe" autocomplete="current-password"><button class="p" onclick="fbLogin()">Se connecter</button><div id="fbm"></div></div>`;
  return `<div class="card"><b>☁ Sauvegarde en ligne</b><div class="mu">Connecté : ${esc(s.email)}</div><input id="fn" placeholder="Note (facultatif)"><button class="p" onclick="fbNow()">☁ Sauvegarder en ligne maintenant</button><label style="display:flex;gap:6px;align-items:center;margin:8px 0"><input type="checkbox" style="width:auto"${ls(K+'_auto')==='0'?'':' checked'} onchange="ls(K+'_auto',this.checked?'1':'0')"> Sauvegarde automatique (1 par jour au plus)</label><div id="fbm"></div><h2>Points de restauration</h2><div id="fl"></div><p><button onclick="fbOut()">Se déconnecter</button></p></div>`}
 /*FB-END*/
+/*PUB-START*/
+const dbp=()=>`projects/${FBP}/databases/(default)/documents`,DBU=()=>`https://firestore.googleapis.com/v1/${dbp()}`;
+function toFS(v){
+ if(v===null||v===undefined)return{nullValue:null};
+ if(typeof v==='string')return{stringValue:v};
+ if(typeof v==='boolean')return{booleanValue:v};
+ if(typeof v==='number')return Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v};
+ if(Array.isArray(v))return{arrayValue:{values:v.map(toFS)}};
+ return{mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k,x])=>[k,toFS(x)]))}}}
+const hs=t=>{let h=5381;for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return t.length+':'+h};
+function portailDoc(s){
+ const g=G(s.g),am=ls(K+'_amt')!=='0';
+ return{n:s.n||'',p:s.p||'',niv:s.niv||'',sec:s.sec||'',m:s.m||[],g:s.g||'',gn:g?g.name:'',gh:g?(g.h||''):'',
+  nbs:att(s),nbp:paid(s),solde:unp(s),sd:s.sd||0,
+  pres:D.sessions.filter(x=>x.att.includes(s.id)).sort((a,b)=>b.d.localeCompare(a.d)).map(x=>({d:x.d,m:x.m})),
+  pay:D.pays.filter(p=>p.s===s.id).sort((a,b)=>b.d.localeCompare(a.d)).map(p=>am?{d:p.d,n:p.n,a:p.a}:{d:p.d,n:p.n})}}
+async function fbPublish(force){
+ const t=await fbTok(),old=JSON.parse(ls(K+'_pubh')||'{}'),nh={},W=[];
+ for(const s of D.students){const d=portailDoc(s);nh[s.id]=hs(JSON.stringify(d));if(force||old[s.id]!==nh[s.id]){d.maj=new Date().toISOString();W.push({update:{name:dbp()+'/portail/'+s.id,fields:toFS(d).mapValue.fields}})}}
+ const ex=await fbReq('GET',DBU()+'/portail?pageSize=300&mask.fieldPaths=n',t),keep=new Set(D.students.map(s=>s.id));
+ (ex.documents||[]).forEach(x=>{if(!keep.has(x.name.split('/').pop()))W.push({delete:x.name})});
+ for(let i=0;i<W.length;i+=400)await fbReq('POST',DBU()+':commit',t,{writes:W.slice(i,i+400)});
+ ls(K+'_pubh',JSON.stringify(nh));ls(K+'_pubt',String(Date.now()));return W.length}
+function autoPub(){if(!fbOn()||ls(K+'_pub')!=='1')return;clearTimeout(ptm);ptm=setTimeout(()=>fbPublish().catch(()=>{}),15000)}
+async function pubNow(){const x=$('pbm');x.innerHTML='<div class="banner">Publication…</div>';try{await fbPublish(true);x.innerHTML=`<div class="banner">✓ ${D.students.length} fiches publiées le ${new Date().toLocaleString('fr-FR')}</div>`}catch(e){x.innerHTML=`<div class="banner e">${esc(e.message)}</div>`}}
+function togPub(c){ls(K+'_pub',c?'1':'0');if(c)autoPub()}
+function togAmt(c){ls(K+'_amt',c?'1':'0');ls(K+'_pubh','{}');autoPub()}
+function fbPubCard(){
+ const s=JSON.parse(ls(K+'_fb')||'null');if(!s)return'';
+ const link=ELEVE_URL,pt=+ls(K+'_pubt')||0;
+ return `<div class="card"><b>🎓 Application élève</b><div class="mu">Lien à donner aux élèves : <span style="word-break:break-all;user-select:all">${esc(link)}</span></div><div class="mu">Ton UID (pour les règles Firestore) : <span style="word-break:break-all;user-select:all">${esc(s.uid||'')}</span></div>
+ <label style="display:flex;gap:6px;align-items:center;margin:8px 0"><input type="checkbox" style="width:auto"${ls(K+'_pub')==='1'?' checked':''} onchange="togPub(this.checked)"> Publier automatiquement les fiches élèves</label>
+ <label style="display:flex;gap:6px;align-items:center;margin:8px 0"><input type="checkbox" style="width:auto"${ls(K+'_amt')==='0'?'':' checked'} onchange="togAmt(this.checked)"> Montrer les montants payés aux élèves</label>
+ <button class="p" onclick="pubNow()">📤 Publier maintenant</button><div class="mu">${pt?'Dernière publication : '+new Date(pt).toLocaleString('fr-FR'):'Pas encore publié.'}</div><div id="pbm"></div></div>`}
+function annCard(){
+ if(!fbOn())return `<div class="card"><b>📢 Annonces aux élèves</b><div class="mu">Connecte-toi dans l’onglet Export pour publier des annonces.</div></div>`;
+ return `<div class="card"><b>📢 Nouvelle annonce</b><select id="ac"><option value="all">Tous les groupes</option>${gopts('')}</select>
+ <select id="at"><option value="info">Information (séance reportée…)</option><option value="devoir">Travail à faire</option></select>
+ <input id="ati" placeholder="Titre (ex. Séance de samedi reportée à 16h)"><textarea id="atx" style="min-height:70px" placeholder="Détails (facultatif)"></textarea>
+ <label class="mu">Date limite (pour un travail)</label><input id="adl" type="date"><button class="p" onclick="postAnn()">Publier l’annonce</button><div id="am"></div><div id="al"></div></div>`}
+function annMsg(m,e){const x=$('am');if(x)x.innerHTML=`<div class="banner${e?' e':''}">${esc(m)}</div>`}
+async function postAnn(){
+ const ti=$('ati').value.trim();if(!ti)return annMsg('Saisis un titre',1);
+ try{const t=await fbTok(),f=toFS({cible:$('ac').value,type:$('at').value,titre:ti,texte:$('atx').value.trim(),limite:$('at').value==='devoir'?($('adl').value||''):''}).mapValue.fields;
+ f.cree={timestampValue:new Date().toISOString()};
+ await fbReq('POST',DBU()+'/annonces',t,{fields:f});$('ati').value='';$('atx').value='';annMsg('✓ Annonce publiée');annList()}catch(e){annMsg(e.message,1)}}
+async function annList(){
+ const b=$('al');if(!b||!fbOn())return;
+ try{const t=await fbTok(),r=await fbReq('GET',DBU()+'/annonces?pageSize=20&orderBy='+encodeURIComponent('cree desc'),t);
+ b.innerHTML=(r.documents||[]).map(d=>{const f=d.fields||{},v=k=>f[k]&&f[k].stringValue||'',id=d.name.split('/').pop();return `<div class="it"><div><b>${v('type')==='devoir'?'📝':'📢'} ${esc(v('titre'))}</b><div class="mu">${v('cible')==='all'?'Tous':esc(gn(v('cible')))} · ${f.cree?new Date(f.cree.timestampValue).toLocaleDateString('fr-FR'):''}${v('limite')?' · pour le '+v('limite'):''}</div></div><button class="d" onclick="delAnn('${id}')">✕</button></div>`}).join('')||'<div class="mu">Aucune annonce.</div>'}catch(e){b.innerHTML=`<div class="banner e">${esc(e.message)}</div>`}}
+async function delAnn(id){if(confirm('Supprimer cette annonce ?'))try{await fbReq('DELETE',DBU()+'/annonces/'+id,await fbTok());annList()}catch(e){annMsg(e.message,1)}}
+/*PUB-END*/
 function vX(){
- $('v').innerHTML=fbCard()+`<div class="card"><p><button class="p" onclick="out(genSQL(),'gestion.sql','text/plain');dl()">💾 Sauvegarder maintenant (fichier SQL)</button></p><div class="mu">${lastBk()?'Dernière sauvegarde : '+new Date(lastBk()).toLocaleString('fr-FR'):'Aucune sauvegarde pour le moment.'}</div><div class="row"><button onclick="out(genSQL(),'gestion.sql','text/plain')">SQL</button><button onclick="out(genCSV(),'eleves.csv','text/csv')">CSV élèves</button><button onclick="out(genPay(),'paiements.csv','text/csv')">CSV paiements</button><button onclick="out(JSON.stringify(D),'sauvegarde.json','application/json')">JSON</button></div>
+ $('v').innerHTML=fbCard()+fbPubCard()+`<div class="card"><p><button class="p" onclick="out(genSQL(),'gestion.sql','text/plain');dl()">💾 Sauvegarder maintenant (fichier SQL)</button></p><div class="mu">${lastBk()?'Dernière sauvegarde : '+new Date(lastBk()).toLocaleString('fr-FR'):'Aucune sauvegarde pour le moment.'}</div><div class="row"><button onclick="out(genSQL(),'gestion.sql','text/plain')">SQL</button><button onclick="out(genCSV(),'eleves.csv','text/csv')">CSV élèves</button><button onclick="out(genPay(),'paiements.csv','text/csv')">CSV paiements</button><button onclick="out(JSON.stringify(D),'sauvegarde.json','application/json')">JSON</button></div>
  <textarea id="o" placeholder="Choisis un format : le contenu apparaît ici."></textarea>
  <div class="row"><button onclick="cp()">Copier</button><button onclick="dl()">Télécharger / partager</button></div><div id="xm" class="mu"></div></div>
  <div class="card"><b>Restaurer une sauvegarde (fichier SQL ou JSON)</b><input type="file" id="fi" accept=".sql,.json,.txt" onchange="rf(this)"><textarea id="im" placeholder="Ou colle ici le contenu du fichier"></textarea><button onclick="imp()">Restaurer</button></div>`;if(ls(K+'_fb'))fbList()}
